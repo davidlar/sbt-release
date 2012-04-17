@@ -14,11 +14,11 @@ object ReleaseStateTransformations {
     if (!new File(".git").exists) {
       sys.error("Aborting release. Working directory is not a git repository.")
     }
-    val status = (Git.status !!).trim
+    val status = (Git(st).status !!).trim
     if (!status.isEmpty) {
       sys.error("Aborting release. Working directory is dirty.")
     }
-    st.logger.info("Starting release process off git commit: " + Git.currentHash)
+    st.logger.info("Starting release process off git commit: " + Git(st).currentHash)
     st
   }
 
@@ -81,11 +81,12 @@ object ReleaseStateTransformations {
     st.logger.info("Setting version to '%s'." format selected)
 
 
-    val versionString = "%sversion in ThisBuild := \"%s\"%s" format (lineSep, selected, lineSep)
-    IO.write(new File("version.sbt"), versionString)
+    val versionString = "%sversion := \"%s\"%s" format (lineSep, selected, lineSep)
+    val baseDir = st.extract.get(baseDirectory)
+    IO.write(new File(baseDir, "version.sbt"), versionString)
 
     reapply(Seq(
-      version in ThisBuild := selected
+      version := selected
     ), st)
   }
 
@@ -93,16 +94,16 @@ object ReleaseStateTransformations {
     val newState = commitVersion("Releasing %s")(st)
     reapply(Seq[Setting[_]](
       packageOptions += ManifestAttributes(
-        "Git-Release-Hash" -> Git.currentHash
+        "Git-Release-Hash" -> Git(st).currentHash
       )
     ), newState)
   }
   lazy val commitNextVersion: ReleasePart = commitVersion("Bump to %s")
   private def commitVersion(msgPattern: String): ReleasePart = { st =>
-    val v = st.extract.get(version in ThisBuild)
+    val v = st.extract.get(version)
 
-    Git.add("version.sbt") !! st.logger
-    Git.commit(msgPattern format v) !! st.logger
+    Git(st).add("version.sbt") !! st.logger
+    Git(st).commit(msgPattern format v) !! st.logger
 
     st
   }
@@ -110,7 +111,7 @@ object ReleaseStateTransformations {
   lazy val tagRelease: ReleasePart = { st =>
     val tag = st.extract.get(tagName)
 
-    Git.tag(tag) !! st.logger
+    Git(st).tag(tag) !! st.logger
 
     reapply(Seq[Setting[_]](
       packageOptions += ManifestAttributes("Git-Release-Tag" -> tag)

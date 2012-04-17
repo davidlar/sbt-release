@@ -1,17 +1,22 @@
 package sbtrelease
 
 import sbt._
+import Keys._
 
 object Git {
-  import Utilities._
+  def apply(state: State) = new Git(Project.extract(state).get(baseDirectory))
 
   private lazy val gitExec = {
     val maybeOsName = sys.props.get("os.name").map(_.toLowerCase)
     val maybeIsWindows = maybeOsName.filter(_.contains("windows"))
     maybeIsWindows.map(_ => "git.exe").getOrElse("git")
   }
+}
 
-  private def cmd(args: Any*): ProcessBuilder = Process(gitExec +: args.map(_.toString))
+class Git(cwd: File) {
+  import Utilities._
+
+  private def cmd(args: Any*): ProcessBuilder = Process(Git.gitExec +: args.map(_.toString), cwd)
 
   def trackingBranch: String = (cmd("for-each-ref", "--format=%(upstream:short)", "refs/heads/" + currentBranch) !!) trim
 
